@@ -1,0 +1,11 @@
+C1bar: 1.0
+N: 50
+Omega0: 1.0
+epsilon: 0.1
+folder: data
+gammac: 0
+gammam: 0
+muc: 0.1
+mum: 0
+omegaC: 0.1
+time: 18.84

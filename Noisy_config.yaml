@@ -1,0 +1,12 @@
+time: 18.84  # tune t divided by omegam
+N: 50  # Everything in the range 50 to 100 seems to give good results
+omegaC: 0.5
+muc: 0.1   # Optics state parameter 
+mum: 0 # Mechanics coherent state parameter
+C1bar: 1.   # single-photon coupling constant
+epsilon: 0.5 # Oscillation amplitude
+Omega0: 1. # Light-matter coupling oscillation
+folder: data
+gammac: 0 # Optical noise
+gammam: 0.2 # Mechanical noise
+

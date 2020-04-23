@@ -42,6 +42,7 @@ class Solver(object):
 		# Assign parameters to class variables
 		self.time = float(self.args['time']) # Final evolution time 
 		self.N = int(self.args['N']) # Hilbert space size
+		self.M = int(self.args['M']) # Hilbert space size
 		self.omegaC = float(self.args['omegaC']) # optical frequency (rescaled)
 		self.C1bar = float(self.args['C1bar']) # single-photon coupling 
 		self.muc = float(self.args['muc']) # optical coherent state parameter
@@ -188,27 +189,19 @@ class Solver(object):
 
 		# Optics quadratic exp values
 		ada_exp = []
-		aad_exp = []
-		ad2_exp = []
 		a2_exp = []
 
 		# Mechanics quadratic exp values
 		bdb_exp = []
-		bbd_exp = []
-		bd2_exp = []
 		b2_exp = []
 
 		# Mixed expectation values
-		adb_exp = []
 		abd_exp = []
 		ab_exp = []
-		adbd_exp = []
 
 		# Single expectation values
 		a_exp = []
-		ad_exp = []
 		b_exp = []
-		bd_exp = []
 
 		# Calculate exp values for each state
 		for state in states:
@@ -236,17 +229,28 @@ class Solver(object):
 		for i in range(0,len(ada_exp)):
 			# Optics 
 			sigma11 = 1. + 2.*ada_exp[i] - 2.*a_exp[i]*np.conjugate(a_exp[i])
+			sigma33 = 1. + 2.*ada_exp[i] - 2.*a_exp[i]*np.conjugate(a_exp[i])
 			sigma31 = 2.*a2_exp[i] - 2.*a_exp[i]*a_exp[i]
+			sigma13 = 2.*np.conjugate(a2_exp[i]) - 2.*np.conjugate(a_exp[i]*a_exp[i])
 
 			# Mechanics
 			sigma22 = 1. + 2.*bdb_exp[i]  - 2.*b_exp[i]*np.conjugate(b_exp[i])
+			sigma44 = 1. + 2.*bdb_exp[i]  - 2.*b_exp[i]*np.conjugate(b_exp[i])
 			sigma42 = 2.*b2_exp[i] - 2.*b_exp[i]*b_exp[i]
+			sigma24 = 2.*np.conjugate(b2_exp[i]) - 2.*np.conjugate(b_exp[i]*b_exp[i])
 
 			# Mixed sector 
+			sigma12 = 2.*np.conjugate(abd_exp[i]) -2.*np.conjugate(a_exp[i])*b_exp[i] 
 			sigma21 = 2.*abd_exp[i] - 2.*a_exp[i]*np.conjugate(b_exp[i])
 			sigma41 = 2.*ab_exp[i] - 2.*a_exp[i]*b_exp[i]
+			sigma14 = 2.*np.conjugate(ab_exp[i]) - 2.*np.conjugate(a_exp[i]*b_exp[i])
 
-			sigma = np.matrix([[sigma11, np.conjugate(sigma21), np.conjugate(sigma31), np.conjugate(sigma41)], [sigma21, sigma22, np.conjugate(sigma41), np.conjugate(sigma42)], [sigma31, sigma41, sigma11, sigma21], [sigma41, sigma42, np.conjugate(sigma21), sigma22]])
+			sigma23 = 2.*np.conjugate(ab_exp[i]) - 2.*np.conjugate(a_exp[i]*b_exp[i])
+			sigma32 = 2.*ab_exp[i] - 2.*a_exp[i]*b_exp[i]
+			sigma34 = 2.*abd_exp[i] - 2.*a_exp[i]*np.conjugate(b_exp[i])
+			sigma43 = 2.*np.conjugate(abd_exp[i]) - 2.*np.conjugate(a_exp[i])*b_exp[i]
+
+			sigma = np.matrix([[sigma11, sigma12, sigma13, sigma14], [sigma21, sigma22, sigma23, sigma24], [sigma31, sigma32, sigma33, sigma34], [sigma41, sigma42, sigma43, sigma44]])
 			sigmas.append(sigma)
 
 		# Return vector of CMs
@@ -301,14 +305,18 @@ class Solver(object):
 		"""
 		eigenvalues = []
 		S = []
-
+		Omega = 1.j * np.matrix([[-1,0,0,0],[0,-1,0,0],[0,0,1,0],[0,0,0,1]])
 		for sigma in sigmas:
-			eigenvalues.append(np.linalg.eig(sigma))
+			newmat = 1.j*np.dot(Omega, sigma)
+			eigenvalues.append(np.linalg.eig(newmat))
 
 		# Then compute the binary entropy for the smallest and largest eigenvalues 
 		for eigenvalue in eigenvalues:
-			vp = np.amax(eigenvalue[0])
-			vm = np.amin(eigenvalue[0])
+			print(eigenvalue[0])
+			vp = np.amax(np.abs(eigenvalue[0]))
+			vm = np.amin(np.abs(eigenvalue[0]))
+			print(vp)
+			print(vm)
 			s = (vp + 1.)/2. * np.log((vp + 1.)/2.) - (vp - 1.)/2. * np.log((vp-1.)/2.) + (vm + 1.)/2.*np.log((vm + 1.)/2.) - (vm - 1.)/2. * np.log((vm - 1.)/2.)
 			S.append(s)
 
@@ -336,16 +344,22 @@ class Solver(object):
 
 		# Obtain the entropies
 		S = self.CM_entropy(sigmas)
-		print(np.amax(S))
+
+		# Subtrac the entropy of the full non-Gaussian state: 
+		delta = []
+		for i in range(0, len(states)):
+			print("The Gaussian entropy is " + str(S[i]))
+			print("The non-Gaussian entropy is " + str(entropy_vn(states[i])))
+			delta.append(S[i] - entropy_vn(states[i]))
 		
 		# Create folder destination, check if exists if not create
 		st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H.%M.%S')
-		foldername = "data/" + "time_independent/" + "phonon_decoherence/" +  st
+		foldername = "data_correct/" + "time_independent/" + "photon_decoherence/" +  st
 		if not os.path.exists(foldername):
 			os.makedirs(foldername)
 		
 		with open(foldername + "/Svalues", 'w') as f: # Write the values to file
-			for item in S:
+			for item in delta:
 				f.write("%s," % item)
 
 		with open(foldername + "/times", 'w') as f: # Write the times to file, mostly because Mathematica generates different times to the Tsble function
@@ -358,7 +372,8 @@ class Solver(object):
 		
 		# Plot the results	
 		plt.figure(figsize=(10,7.5))
-		plt.plot(times, S)
+		plt.plot(times, np.real(delta))
+		plt.plot(times, np.imag(delta))
 		plt.show()
 
 	def compute_nonGaussianity_time_dependent(self):
@@ -383,16 +398,22 @@ class Solver(object):
 
 		# Obtain the entropies
 		S = self.CM_entropy(sigmas)
-		print(np.amax(S))
+		
+		# Subtrac the entropy of the full non-Gaussian state: 
+		delta = []
+		for i in range(0, len(states)):
+			print("The Gaussian entropy is " + str(S[i]))
+			print("The non-Gaussian entropy is " + str(entropy_vn(states[i])))
+			delta.append(S[i] - entropy_vn(states[i]))
 		
 		# Create folder destination, check if exists if not create
 		st = datetime.datetime.fromtimestamp(time.time()).strftime('%Y-%m-%d-%H.%M.%S')
-		foldername = "data/" + "time_dependent/" + "phonon_decoherence/" + st
+		foldername = "data_correct/" + "time_dependent/" + "photon_decoherence/" + st
 		if not os.path.exists(foldername):
 			os.makedirs(foldername)
 		
 		with open(foldername + "/Svalues", 'w') as f: # Write the values to file
-			for item in S:
+			for item in delta:
 				f.write("%s," % item)
 
 		# Add the current config file into the simulation folder for later identification
@@ -404,7 +425,7 @@ class Solver(object):
 				f.write("%s," % item)
 
 		plt.figure(figsize=(10,7.5))
-		plt.plot(times, S)
+		plt.plot(times, delta)
 		plt.show()
 
 
@@ -476,10 +497,10 @@ class Solver(object):
 
 if __name__ == "__main__":
 	system = Solver('Noisy_config.yaml')
-	print("Run time-independent system? (y/n)")
-	if input() == "y":
+	answer = raw_input("Run time-independent system? (y/n) \n")
+	if answer == "y":
 		system.compute_nonGaussianity_time_independent()
-	print("Run time-dependent system? (y/n)")
-	if input() == "y":
+	answer = raw_input("Run time-dependent system? (y/n) \n")
+	if answer == "y":
+		print("Running the time-dependent solver")
 		system.compute_nonGaussianity_time_dependent()
-	
